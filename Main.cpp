@@ -2,9 +2,58 @@
 #define GLFW_INCLUDE_NONE
 
 #include "iostream"
+#include "fstream"
+#include "sstream"
+#include "string"
 
 #include <GLFW/glfw3.h>
 #include "GL/glew.h"
+
+struct ShaderProgramSource 
+{
+	std::string Vertex;
+	std::string Fragment;
+};
+
+
+ShaderProgramSource ParseShaderSourceFile(std::string filepath)
+{
+	std::ifstream stream(filepath);
+	ShaderProgramSource source;
+	enum class State 
+	{
+		NONE, VERTEX, FRAGMENT
+	};
+
+	std::string current_line;
+	State state = State::NONE;
+
+	while(getline(stream, current_line)) 
+	{
+		if (current_line.find("@shader") != std::string::npos) 
+		{
+			if (current_line.find("vertex")) state = State::VERTEX;
+			if (current_line.find("fragment")) state = State::FRAGMENT;
+		}
+		else 
+		{
+			switch (state)
+			{
+			case State::FRAGMENT:
+				source.Fragment.append(current_line);
+				source.Fragment.append("\n");
+				break;
+
+			case State::VERTEX:
+				source.Vertex.append(current_line);
+				source.Fragment.append("\n");
+				break;
+			}
+		}
+	}
+
+	return source;
+}
 
 unsigned int CompileShader(unsigned int type, const std::string& src) {
 	auto shaderId = glCreateShader(type);
@@ -61,25 +110,9 @@ int main() {
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 
-	std::string vertexShader = 
-		"#version 330 core"
-		"\n"
-		"layout(location = 0) in vec4 position;"
-		"\n"
-		"void main() {\n"
-		"gl_Position = position;\n"
-		"}\n"
-		;
-	std::string pixelShader = 
-		"#version 330 core"
-		"\n"
-		"layout(location = 0) out vec4 color;"
-		"\n"
-		"void main() {\n"
-		"color = vec4(1.0, 0.0, 0.0, 1.0);\n"
-		"}\n"
-		;
-	auto shader = CreateShader(vertexShader, pixelShader);
+	auto source = ParseShaderSourceFile("Basic.shader");
+
+	auto shader = CreateShader(source.Vertex, source.Fragment);
 	glUseProgram(shader);
 
 	while(!glfwWindowShouldClose(window)) {
